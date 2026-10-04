@@ -37,6 +37,7 @@ interface VideoPanelProps {
   latencyMetrics?: LatencyMetrics;
   showDevTelemetry?: boolean;
   onToggleDevTelemetry?: () => void;
+  audioLevel?: number;
 }
 
 export const VideoPanel: React.FC<VideoPanelProps> = ({
@@ -53,6 +54,7 @@ export const VideoPanel: React.FC<VideoPanelProps> = ({
   latencyMetrics,
   showDevTelemetry = false,
   onToggleDevTelemetry,
+  audioLevel = 0,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -101,7 +103,7 @@ export const VideoPanel: React.FC<VideoPanelProps> = ({
       >
         {/* Full-Bleed photorealistic AI Tutor video presence: clean frame, no body overlays */}
         <div className="absolute inset-0 w-full h-full overflow-hidden">
-          <TalkingAvatar tutorState={tutorState} />
+          <TalkingAvatar tutorState={tutorState} audioLevel={audioLevel} />
 
           {/* Preserve the uploaded reference framing exactly; no crop, no zoom, no dark overlay. */}
 
