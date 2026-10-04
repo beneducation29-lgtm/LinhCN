@@ -144,8 +144,8 @@ export const OtherView: React.FC<OtherViewProps> = ({
               <Award className="w-5 h-5" />
             </div>
             <div>
-              <span className="text-[11px] font-semibold text-[#6B83AD] uppercase">Độ bao phủ HSK 2</span>
-              <div className="text-[20px] font-bold text-[#183B78]">125/300</div>
+              <span className="text-[11px] font-semibold text-[#6B83AD] uppercase">Kho từ vựng {selectedLevel}</span>
+              <div className="text-[20px] font-bold text-[#183B78]">{getHskProfile(selectedLevel).wordCount} từ</div>
             </div>
           </div>
         </div>
