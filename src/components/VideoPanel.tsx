@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { TutorState } from '../types';
 import { ASSETS } from '../assets';
+import { TalkingAvatar } from './TalkingAvatar';
 
 interface LatencyMetrics {
   sttMs?: number;
@@ -100,17 +101,7 @@ export const VideoPanel: React.FC<VideoPanelProps> = ({
       >
         {/* Full-Bleed photorealistic AI Tutor video presence: clean frame, no body overlays */}
         <div className="absolute inset-0 w-full h-full overflow-hidden">
-          <img
-            src={ASSETS.tutorLinh}
-            alt="Linh · AI Tutor — live video presence"
-            className={`w-full h-full object-contain object-center pointer-events-none transition-transform duration-700 ease-out animate-tutor-presence ${
-              tutorState === 'AI_SPEAKING'
-                ? 'scale-[1.018]'
-                : tutorState === 'LISTENING'
-                ? 'scale-[1.008]'
-                : 'scale-100'
-            }`}
-          />
+          <TalkingAvatar tutorState={tutorState} />
 
           {/* Preserve the uploaded reference framing exactly; no crop, no zoom, no dark overlay. */}
 
