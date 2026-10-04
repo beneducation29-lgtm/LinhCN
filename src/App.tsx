@@ -158,6 +158,7 @@ export default function App() {
     if (isSpeakerMuted || !chineseText) return;
 
     setTutorState('AI_SPEAKING');
+    setAvatarAudioLevel(0);
 
     const audioStart = performance.now();
     await playAudioSpeech(
@@ -172,8 +173,7 @@ export default function App() {
       () => {
         setAvatarAudioLevel(0);
         setTutorState('IDLE');
-        }
-    ,
+      },
       (level) => setAvatarAudioLevel(level)
     );
   };
