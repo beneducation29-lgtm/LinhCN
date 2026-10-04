@@ -9,6 +9,7 @@ import { OtherView } from './components/OtherViews';
 import { HskKnowledgeModal } from './components/HskKnowledgeModal';
 import { HskLevelSelectorModal } from './components/HskLevelSelectorModal';
 import { SessionSummaryModal } from './components/SessionSummaryModal';
+import { AuthScreen } from './components/AuthScreen';
 import { Message, TopicInfo, TutorState } from './types';
 import { HskLevel, getTopic, getRelevantVocab, getHskProfile } from './data/hsk';
 import { playAudioSpeech, stopAudioSpeech, SpeechRecognitionManager } from './utils/speech';
@@ -22,6 +23,23 @@ interface LatencyMetrics {
 
 export default function App() {
   // Navigation & tabs
+  const [authUser, setAuthUser] = useState<{id:string; email:string; name:string} | null>(null);
+  const [authChecking, setAuthChecking] = useState(true);
+
+  useEffect(() => {
+    fetch('/api/auth/me', { credentials: 'include' })
+      .then(async (r) => r.ok ? r.json() : ({ authenticated: false }))
+      .then((data) => setAuthUser(data.user || null))
+      .catch(() => setAuthUser(null))
+      .finally(() => setAuthChecking(false));
+  }, []);
+
+  const handleLogout = async () => {
+    await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {});
+    stopAudioSpeech();
+    setAuthUser(null);
+  };
+
   const [activeTab, setActiveTab] = useState('speaking');
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
 
@@ -35,7 +53,7 @@ export default function App() {
   // Settings & Dynamic HSK Level (Zero hardcoded HSK 2 default!)
   const [speechRate, setSpeechRate] = useState(0.9);
   const [hskLevel, setHskLevel] = useState<HskLevel>(() => {
-    const saved = localStorage.getItem('ai_tutor_user_hsk_level') as HskLevel;
+    const saved = localStorage.getItem('ai_tutor_user_hsk_level:' + (authUser?.id || 'guest')) as HskLevel;
     if (saved && ['HSK 1', 'HSK 2', 'HSK 3', 'HSK 4', 'HSK 5', 'HSK 6'].includes(saved)) {
       return saved;
     }
@@ -398,7 +416,7 @@ export default function App() {
   // Dynamic Level Switching (HSK 1 - 6)
   const handleSelectHskLevel = (lvl: HskLevel) => {
     setHskLevel(lvl);
-    localStorage.setItem('ai_tutor_user_hsk_level', lvl);
+    if (authUser?.id) localStorage.setItem('ai_tutor_user_hsk_level:' + authUser.id, lvl);
 
     const activeProfile = getHskProfile(lvl);
     const activeTopicDef = getTopic(lvl);
@@ -478,6 +496,9 @@ export default function App() {
           onOpenHskModal={() => setIsHskModalOpen(true)}
           onOpenLevelSelector={() => setIsLevelSelectorOpen(true)}
           onToggleMobileSidebar={() => setShowMobileSidebar(true)}
+          userName={authUser.name}
+          userEmail={authUser.email}
+          onLogout={handleLogout}
         />
 
         <main className="flex-1 p-4 sm:p-6 lg:p-7 overflow-y-auto">
