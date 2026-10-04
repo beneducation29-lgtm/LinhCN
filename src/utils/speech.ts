@@ -8,12 +8,16 @@ declare global {
 }
 
 let activeAudio: HTMLAudioElement | null = null;
+let activeAudioContext: AudioContext | null = null;
+let activeAnalyser: AnalyserNode | null = null;
+let activeAnimationFrame: number | null = null;
 
 export const playAudioSpeech = async (
   text: string,
   rate = 0.9,
   onStart?: () => void,
-  onEnd?: () => void
+  onEnd?: () => void,
+  onAudioLevel?: (level: number) => void
 ): Promise<number> => {
   if (!text) {
     onEnd?.();
@@ -39,6 +43,7 @@ export const playAudioSpeech = async (
         const audio = new Audio(`data:${data.format || 'audio/wav'};base64,${data.audioBase64}`);
         audio.playbackRate = rate;
         activeAudio = audio;
+        setupAudioLevelMeter(audio, onAudioLevel);
 
         let firstAudioRecorded = false;
         audio.onplay = () => {
@@ -49,13 +54,17 @@ export const playAudioSpeech = async (
         };
 
         audio.onended = () => {
+          stopAudioMeter();
           activeAudio = null;
+          onAudioLevel?.(0);
           onEnd?.();
         };
 
         audio.onerror = () => {
+          stopAudioMeter();
           activeAudio = null;
-          fallbackBrowserTTS(text, rate, onStart, onEnd);
+          onAudioLevel?.(0);
+          fallbackBrowserTTS(text, rate, onStart, onEnd, onAudioLevel);
         };
 
         await audio.play();
@@ -67,7 +76,7 @@ export const playAudioSpeech = async (
   }
 
   // Fallback to Web Speech Synthesis API
-  fallbackBrowserTTS(text, rate, onStart, onEnd);
+  fallbackBrowserTTS(text, rate, onStart, onEnd, onAudioLevel);
   return Math.round(performance.now() - ttsStartTime);
 };
 
@@ -76,6 +85,7 @@ export const stopAudioSpeech = () => {
     activeAudio.pause();
     activeAudio = null;
   }
+  stopAudioMeter();
   if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
     window.speechSynthesis.cancel();
   }
@@ -85,7 +95,8 @@ const fallbackBrowserTTS = (
   text: string,
   rate = 0.9,
   onStart?: () => void,
-  onEnd?: () => void
+  onEnd?: () => void,
+  onAudioLevel?: (level: number) => void
 ) => {
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
     onEnd?.();
@@ -115,19 +126,83 @@ const fallbackBrowserTTS = (
     utterance.voice = zhVoice;
   }
 
+  let pulseFrame: number | null = null;
+  const pulse = () => {
+    const t = performance.now();
+    const syntheticLevel = 0.18 + 0.18 * (0.5 + 0.5 * Math.sin(t / 115));
+    onAudioLevel?.(syntheticLevel);
+    pulseFrame = requestAnimationFrame(pulse);
+  };
+
   utterance.onstart = () => {
     onStart?.();
+    pulse();
   };
 
   utterance.onend = () => {
+    if (pulseFrame !== null) cancelAnimationFrame(pulseFrame);
+    onAudioLevel?.(0);
     onEnd?.();
   };
 
   utterance.onerror = () => {
+    if (pulseFrame !== null) cancelAnimationFrame(pulseFrame);
+    onAudioLevel?.(0);
     onEnd?.();
   };
 
   window.speechSynthesis.speak(utterance);
+};
+
+
+const setupAudioLevelMeter = (audio: HTMLAudioElement, onAudioLevel?: (level: number) => void) => {
+  if (!onAudioLevel || typeof window === 'undefined') return;
+  try {
+    const AudioContextCtor = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioContextCtor) return;
+
+    const context = new AudioContextCtor();
+    const source = context.createMediaElementSource(audio);
+    const analyser = context.createAnalyser();
+    analyser.fftSize = 256;
+    analyser.smoothingTimeConstant = 0.72;
+    source.connect(analyser);
+    analyser.connect(context.destination);
+    void context.resume();
+
+    activeAudioContext = context;
+    activeAnalyser = analyser;
+    const data = new Uint8Array(analyser.frequencyBinCount);
+
+    const tick = () => {
+      if (!activeAnalyser || activeAnalyser !== analyser) return;
+      analyser.getByteTimeDomainData(data);
+      let sum = 0;
+      for (let i = 0; i < data.length; i++) {
+        const normalized = (data[i] - 128) / 128;
+        sum += normalized * normalized;
+      }
+      const rms = Math.sqrt(sum / data.length);
+      onAudioLevel(Math.min(1, Math.max(0, rms * 5.2)));
+      activeAnimationFrame = requestAnimationFrame(tick);
+    };
+    tick();
+  } catch (err) {
+    console.warn('Audio analyser unavailable; using speaking animation fallback:', err);
+  }
+};
+
+const stopAudioMeter = () => {
+  if (activeAnimationFrame !== null) {
+    cancelAnimationFrame(activeAnimationFrame);
+    activeAnimationFrame = null;
+  }
+  try { activeAnalyser?.disconnect(); } catch (_) {}
+  activeAnalyser = null;
+  if (activeAudioContext) {
+    void activeAudioContext.close().catch(() => {});
+    activeAudioContext = null;
+  }
 };
 
 export class SpeechRecognitionManager {
