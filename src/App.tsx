@@ -55,7 +55,6 @@ export default function App() {
     pinyin?: string;
     vietnamese?: string;
   } | null>(null);
-  const [activeChineseSnippet, setActiveChineseSnippet] = useState<string>('');
   const [recentQuestions, setRecentQuestions] = useState<string[]>([]);
   const [wordsUsedSet, setWordsUsedSet] = useState<Set<string>>(new Set());
 
@@ -117,7 +116,6 @@ export default function App() {
     if (isSpeakerMuted || !chineseText) return;
 
     setTutorState('AI_SPEAKING');
-    setActiveChineseSnippet(chineseText.split('\n')[0]);
 
     const audioStart = performance.now();
     await playAudioSpeech(
@@ -131,8 +129,7 @@ export default function App() {
       },
       () => {
         setTutorState('IDLE');
-        setActiveChineseSnippet('');
-      }
+        }
     );
   };
 
@@ -145,7 +142,6 @@ export default function App() {
 
     // Barge-in: Stop any existing TTS speech
     stopAudioSpeech();
-    setActiveChineseSnippet('');
 
     if (isMicActive) {
       speechManagerRef.current?.stop();
@@ -507,7 +503,6 @@ export default function App() {
                   latencyMetrics={latencyMetrics}
                   showDevTelemetry={showDevTelemetry}
                   onToggleDevTelemetry={() => setShowDevTelemetry(!showDevTelemetry)}
-                  activeChineseSnippet={activeChineseSnippet}
                 />
               </div>
 
