@@ -914,6 +914,10 @@ if (process.env.NODE_ENV !== "production") {
 void ensureAuthDb().catch((error) => console.error("Auth database initialization failed:", error?.message || error));
 
 const PORT = Number(process.env.PORT) || 3000;
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Server is ready on port ${PORT}`);
-});
+if (process.env.VERCEL !== "1") {
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`Server is ready on port ${PORT}`);
+  });
+}
+
+export default app;
