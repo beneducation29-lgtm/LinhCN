@@ -91,6 +91,7 @@ export default function App() {
 
   // Conversation & Streaming state
   const [tutorState, setTutorState] = useState<TutorState>('IDLE');
+  const [avatarAudioLevel, setAvatarAudioLevel] = useState(0);
   const [streamingMessage, setStreamingMessage] = useState<{
     chinese: string;
     pinyin?: string;
@@ -169,8 +170,11 @@ export default function App() {
         console.log(`[Speaking] tts_first_audio: ${ttsElapsed}ms`);
       },
       () => {
+        setAvatarAudioLevel(0);
         setTutorState('IDLE');
         }
+    ,
+      (level) => setAvatarAudioLevel(level)
     );
   };
 
@@ -424,6 +428,7 @@ export default function App() {
   // End Call & trigger Session Summary
   const handleEndCall = () => {
     stopAudioSpeech();
+    setAvatarAudioLevel(0);
     speechManagerRef.current?.stop();
     setIsMicActive(false);
     setStreamingMessage(null);
@@ -550,6 +555,7 @@ export default function App() {
                   latencyMetrics={latencyMetrics}
                   showDevTelemetry={showDevTelemetry}
                   onToggleDevTelemetry={() => setShowDevTelemetry(!showDevTelemetry)}
+                  audioLevel={avatarAudioLevel}
                 />
               </div>
 
