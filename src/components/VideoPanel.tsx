@@ -36,7 +36,6 @@ interface VideoPanelProps {
   latencyMetrics?: LatencyMetrics;
   showDevTelemetry?: boolean;
   onToggleDevTelemetry?: () => void;
-  activeChineseSnippet?: string; // Optional compact 1-line subtitle at bottom-most edge
 }
 
 export const VideoPanel: React.FC<VideoPanelProps> = ({
@@ -53,7 +52,6 @@ export const VideoPanel: React.FC<VideoPanelProps> = ({
   latencyMetrics,
   showDevTelemetry = false,
   onToggleDevTelemetry,
-  activeChineseSnippet,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -100,12 +98,12 @@ export const VideoPanel: React.FC<VideoPanelProps> = ({
             : 'border-[#DDE8F8]'
         }`}
       >
-        {/* Full-Bleed Photorealistic Video Feed */}
+        {/* Full-Bleed photorealistic AI Tutor video presence: clean frame, no body overlays */}
         <div className="absolute inset-0 w-full h-full overflow-hidden">
           <img
             src={ASSETS.tutorLinh}
-            alt="AI Tutor Linh Live Camera"
-            className={`w-full h-full object-cover object-[center_28%] pointer-events-none transition-transform duration-700 ease-out animate-tutor-presence ${
+            alt="Linh · AI Tutor — live video presence"
+            className={`w-full h-full object-cover object-[center_34%] pointer-events-none transition-transform duration-700 ease-out animate-tutor-presence ${
               tutorState === 'AI_SPEAKING'
                 ? 'scale-[1.018]'
                 : tutorState === 'LISTENING'
@@ -218,14 +216,6 @@ export const VideoPanel: React.FC<VideoPanelProps> = ({
             No bubbles, no floating transcripts over Linh's body.
            ======================================================== */}
 
-        {/* Optional Ultra-Thin 1-line Subtitle at the extreme bottom edge */}
-        {activeChineseSnippet && tutorState === 'AI_SPEAKING' && (
-          <div className="absolute bottom-3 left-4 right-4 z-20 pointer-events-none flex justify-center">
-            <div className="bg-black/60 backdrop-blur-md text-white/95 font-chinese text-[13.5px] px-3.5 py-1 rounded-full border border-white/10 shadow-sm max-w-[85%] truncate text-center">
-              {activeChineseSnippet}
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Developer Latency Telemetry Banner (Visible when toggled) */}
