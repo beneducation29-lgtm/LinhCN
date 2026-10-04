@@ -90,7 +90,7 @@ export const VideoPanel: React.FC<VideoPanelProps> = ({
       {/* Live AI Tutor Webcam Frame */}
       <div
         ref={containerRef}
-        className={`relative w-full rounded-2xl overflow-hidden border bg-[#0B1528] shadow-md aspect-[4/3] sm:aspect-[16/10] xl:aspect-[16/10.2] select-none flex items-center justify-center transition-all duration-500 ${
+        className={`relative w-full rounded-[24px] overflow-hidden border bg-[#101827] shadow-[0_18px_60px_rgba(24,59,120,0.16)] aspect-[4/3] sm:aspect-[16/10] xl:aspect-[16/10.2] select-none flex items-center justify-center transition-all duration-500 ${
           tutorState === 'AI_SPEAKING'
             ? 'border-[#3F6FF5]/60 ring-2 ring-[#3F6FF5]/20 shadow-[#3F6FF5]/10'
             : tutorState === 'LISTENING'
@@ -103,7 +103,7 @@ export const VideoPanel: React.FC<VideoPanelProps> = ({
           <img
             src={ASSETS.tutorLinh}
             alt="Linh · AI Tutor — live video presence"
-            className={`w-full h-full object-cover object-[center_34%] pointer-events-none transition-transform duration-700 ease-out animate-tutor-presence ${
+            className={`w-full h-full object-cover object-[center_36%] pointer-events-none transition-transform duration-700 ease-out animate-tutor-presence ${
               tutorState === 'AI_SPEAKING'
                 ? 'scale-[1.018]'
                 : tutorState === 'LISTENING'
@@ -112,8 +112,8 @@ export const VideoPanel: React.FC<VideoPanelProps> = ({
             }`}
           />
 
-          {/* Natural camera atmospheric lighting overlay (light at edges, clear on center) */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-black/30 pointer-events-none" />
+          {/* Very subtle camera depth treatment; keep the reference photo bright and natural. */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/14 via-transparent to-white/5 pointer-events-none" />
 
           {/* Live Audio Visualizer Glow (only when speaking) */}
           {tutorState === 'AI_SPEAKING' && (
@@ -124,7 +124,7 @@ export const VideoPanel: React.FC<VideoPanelProps> = ({
         {/* ========================================================
             TOP SAFE OVERLAY ZONE: Outside body & head area
            ======================================================== */}
-        <div className="absolute top-4 left-4 right-4 flex items-center justify-between z-20 pointer-events-auto">
+        <div className="absolute top-4 left-4 right-4 flex items-start justify-between z-20 pointer-events-auto">
           {/* Top-Left: AI Tutor Status Badge */}
           <div className="bg-[#102244]/80 backdrop-blur-md border border-white/15 text-white rounded-full pl-2 pr-4 py-1.5 flex items-center gap-2.5 shadow-md transition-all">
             <div
@@ -154,7 +154,7 @@ export const VideoPanel: React.FC<VideoPanelProps> = ({
 
             <div className="flex flex-col text-left">
               <span className="font-semibold text-[13px] text-white tracking-tight leading-tight flex items-center gap-1.5">
-                <span>AI Tutor - Linh</span>
+                <span>Linh · AI Tutor</span>
                 {tutorState === 'AI_SPEAKING' && (
                   <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping inline-block" />
                 )}
