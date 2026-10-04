@@ -495,6 +495,21 @@ export default function App() {
     ]);
   };
 
+  if (authChecking) {
+    return (
+      <div className="min-h-screen bg-[#F8FBFF] flex items-center justify-center">
+        <div className="text-center">
+          <div className="mx-auto h-10 w-10 rounded-full border-4 border-[#DDE8F8] border-t-[#3F6FF5] animate-spin" />
+          <p className="mt-4 text-sm font-medium text-[#6B83AD]">Đang mở phòng học của bạn...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!authUser) {
+    return <AuthScreen onAuthenticated={(user) => setAuthUser(user)} />;
+  }
+
   return (
     <div className="flex min-h-screen bg-[#F8FBFF] text-[#183B78]">
       {/* Fixed Sidebar */}
