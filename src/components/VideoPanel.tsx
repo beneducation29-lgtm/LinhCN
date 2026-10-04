@@ -90,7 +90,7 @@ export const VideoPanel: React.FC<VideoPanelProps> = ({
       {/* Live AI Tutor Webcam Frame */}
       <div
         ref={containerRef}
-        className={`relative w-full rounded-[24px] overflow-hidden border bg-[#101827] shadow-[0_18px_60px_rgba(24,59,120,0.16)] aspect-[4/3] sm:aspect-[16/10] xl:aspect-[16/10.2] select-none flex items-center justify-center transition-all duration-500 ${
+        className={`relative w-full rounded-[24px] overflow-hidden border bg-white shadow-[0_18px_60px_rgba(24,59,120,0.16)] aspect-[1106/1422] sm:aspect-[1106/1422] lg:aspect-[1106/1422] max-h-[calc(100vh-170px)] select-none flex items-center justify-center transition-all duration-500 ${
           tutorState === 'AI_SPEAKING'
             ? 'border-[#3F6FF5]/60 ring-2 ring-[#3F6FF5]/20 shadow-[#3F6FF5]/10'
             : tutorState === 'LISTENING'
@@ -103,7 +103,7 @@ export const VideoPanel: React.FC<VideoPanelProps> = ({
           <img
             src={ASSETS.tutorLinh}
             alt="Linh · AI Tutor — live video presence"
-            className={`w-full h-full object-cover object-[center_36%] pointer-events-none transition-transform duration-700 ease-out animate-tutor-presence ${
+            className={`w-full h-full object-contain object-center pointer-events-none transition-transform duration-700 ease-out animate-tutor-presence ${
               tutorState === 'AI_SPEAKING'
                 ? 'scale-[1.018]'
                 : tutorState === 'LISTENING'
@@ -112,8 +112,7 @@ export const VideoPanel: React.FC<VideoPanelProps> = ({
             }`}
           />
 
-          {/* Very subtle camera depth treatment; keep the reference photo bright and natural. */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/14 via-transparent to-white/5 pointer-events-none" />
+          {/* Preserve the uploaded reference framing exactly; no crop, no zoom, no dark overlay. */}
 
           {/* Live Audio Visualizer Glow (only when speaking) */}
           {tutorState === 'AI_SPEAKING' && (
