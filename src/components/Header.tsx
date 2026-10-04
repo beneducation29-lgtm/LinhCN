@@ -11,6 +11,7 @@ import {
   BookMarked,
 } from 'lucide-react';
 import { ASSETS } from '../assets';
+import { HskLevel, getHskProfile } from '../data/hsk';
 
 interface HeaderProps {
   onBack?: () => void;
@@ -19,7 +20,7 @@ interface HeaderProps {
   onToggleMobileSidebar?: () => void;
   onOpenHskModal?: () => void;
   onOpenLevelSelector?: () => void;
-  hskLevel?: string;
+  hskLevel?: HskLevel;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -138,7 +139,7 @@ export const Header: React.FC<HeaderProps> = ({
                   className="w-full px-4 py-2 text-left text-[13px] text-[#183B78] hover:bg-[#F0F6FF] flex items-center gap-2.5"
                 >
                   <Award className="w-4 h-4 text-[#6B83AD]" />
-                  <span>Cấp độ HSK 2 (85%)</span>
+                  <span>Cấp độ {hskLevel} · {getHskProfile(hskLevel).wordCount} từ</span>
                 </button>
                 <button
                   onClick={() => setShowProfileMenu(false)}
