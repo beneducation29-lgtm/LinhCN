@@ -1,0 +1,7 @@
+{
+  "name": "Cùng Luyện Nói - Phòng Luyện Nói AI HSK",
+  "description": "Phòng luyện nói ngoại ngữ cùng AI Tutor Linh - Nói tự tin, tiến bộ mỗi ngày theo chuẩn HSK 2",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
