@@ -21,6 +21,9 @@ interface HeaderProps {
   onOpenHskModal?: () => void;
   onOpenLevelSelector?: () => void;
   hskLevel?: HskLevel;
+  userName?: string;
+  userEmail?: string;
+  onLogout?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -122,7 +125,7 @@ export const Header: React.FC<HeaderProps> = ({
                   Nguyễn Minh Triết
                 </p>
                 <p className="text-[11px] text-[#6B83AD]">
-                  bengovap29@gmail.com
+                  {userEmail}
                 </p>
               </div>
 
