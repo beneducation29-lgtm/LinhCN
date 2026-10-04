@@ -11,6 +11,7 @@ let activeAudio: HTMLAudioElement | null = null;
 let activeAudioContext: AudioContext | null = null;
 let activeAnalyser: AnalyserNode | null = null;
 let activeAnimationFrame: number | null = null;
+let activeFallbackFrame: number | null = null;
 
 export const playAudioSpeech = async (
   text: string,
@@ -86,6 +87,10 @@ export const stopAudioSpeech = () => {
     activeAudio = null;
   }
   stopAudioMeter();
+  if (activeFallbackFrame !== null) {
+    cancelAnimationFrame(activeFallbackFrame);
+    activeFallbackFrame = null;
+  }
   if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
     window.speechSynthesis.cancel();
   }
@@ -126,12 +131,12 @@ const fallbackBrowserTTS = (
     utterance.voice = zhVoice;
   }
 
-  let pulseFrame: number | null = null;
+  if (activeFallbackFrame !== null) cancelAnimationFrame(activeFallbackFrame);
   const pulse = () => {
     const t = performance.now();
     const syntheticLevel = 0.18 + 0.18 * (0.5 + 0.5 * Math.sin(t / 115));
     onAudioLevel?.(syntheticLevel);
-    pulseFrame = requestAnimationFrame(pulse);
+    activeFallbackFrame = requestAnimationFrame(pulse);
   };
 
   utterance.onstart = () => {
@@ -140,7 +145,8 @@ const fallbackBrowserTTS = (
   };
 
   utterance.onend = () => {
-    if (pulseFrame !== null) cancelAnimationFrame(pulseFrame);
+    if (activeFallbackFrame !== null) cancelAnimationFrame(activeFallbackFrame);
+    activeFallbackFrame = null;
     onAudioLevel?.(0);
     onEnd?.();
   };
