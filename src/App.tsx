@@ -386,7 +386,6 @@ export default function App() {
     speechManagerRef.current?.stop();
     setIsMicActive(false);
     setStreamingMessage(null);
-    setActiveChineseSnippet('');
     setTutorState('ENDED');
     setIsSummaryModalOpen(true);
   };
@@ -505,7 +504,7 @@ export default function App() {
               </div>
 
               {/* Right Column (Chat & Conversation Panel) ~30% */}
-              <div className="lg:col-span-4 h-[650px] lg:h-[calc(100vh-130px)] min-h-[580px] sticky top-24">
+              <div className="lg:col-span-4 h-[620px] lg:h-[calc(100vh-130px)] min-h-[560px] lg:sticky lg:top-24">
                 <ChatPanel
                   topic={topic}
                   messages={messages}
