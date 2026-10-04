@@ -478,7 +478,7 @@ export const OtherView: React.FC<OtherViewProps> = ({
             <span className="text-[12px] font-semibold uppercase">Từ vựng đã dùng</span>
             <BookOpen className="w-4 h-4 text-[#3F6FF5]" />
           </div>
-          <div className="text-[28px] font-bold text-[#183B78] mt-2">125 từ</div>
+          <div className="text-[28px] font-bold text-[#183B78] mt-2">{getHskProfile(selectedLevel).wordCount} từ</div>
           <p className="text-[12px] text-[#3F6FF5] font-medium mt-1">
             Bao phủ kho từ vựng {selectedLevel}
           </p>
