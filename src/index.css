@@ -91,6 +91,10 @@
   64% { transform: translateX(-50%) scale(1.08, .95); opacity: .22; }
   82% { transform: translateX(-50%) scale(.9, .58); opacity: .13; }
 }
+@keyframes lip-sync-reactive {
+  0%, 100% { transform: translateX(-50%) scale(.72, .35); opacity: .06; }
+  50% { transform: translateX(-50%) scale(calc(.72 + var(--avatar-audio-level, 0) * 1.45), calc(.35 + var(--avatar-audio-level, 0) * 1.65)); opacity: calc(.05 + var(--avatar-audio-level, 0) * .22); }
+}
 @keyframes eye-drift {
   0%, 100% { transform: translateX(0) scaleY(1); }
   45% { transform: translateX(2px) scaleY(.8); }
@@ -102,6 +106,7 @@
   50% { opacity: .55; transform: scaleX(1.04); }
 }
 .animate-lip-sync-soft { animation: lip-sync-soft 430ms ease-in-out infinite; transform-origin: center; }
+.animate-lip-sync-reactive { animation: lip-sync-soft 430ms ease-in-out infinite; transform-origin: center; }
 .animate-eye-drift { animation: eye-drift 4.7s ease-in-out infinite; }
 .animate-eye-drift-delayed { animation: eye-drift 5.3s ease-in-out 1.15s infinite; }
 .animate-audio-presence { animation: audio-presence 900ms ease-in-out infinite; }
