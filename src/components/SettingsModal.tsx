@@ -58,8 +58,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <label className="block text-[13px] font-semibold text-[#183B78] mb-2">
               Trình độ HSK mục tiêu
             </label>
-            <div className="grid grid-cols-4 gap-2">
-              {['HSK 1', 'HSK 2', 'HSK 3', 'HSK 4'].map((lvl) => (
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+              {['HSK 1', 'HSK 2', 'HSK 3', 'HSK 4', 'HSK 5', 'HSK 6'].map((lvl) => (
                 <button
                   key={lvl}
                   type="button"
@@ -98,7 +98,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             />
             <div className="flex justify-between text-[11px] text-[#6B83AD] mt-1 font-medium">
               <span>Chậm (0.7x)</span>
-              <span>Tiêu chuẩn HSK 2 (0.9x)</span>
+              <span>Tốc độ khuyến nghị (0.9x)</span>
               <span>Nhanh (1.3x)</span>
             </div>
           </div>
