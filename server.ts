@@ -1,4 +1,6 @@
 import { GoogleGenAI, Type } from "@google/genai";
+import { sql } from "@vercel/postgres";
+import { createHmac, randomBytes, randomUUID, scrypt } from "node:crypto";
 import dotenv from "dotenv";
 import express from "express";
 import path from "path";
@@ -11,6 +13,222 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 app.use(express.json({ limit: "15mb" }));
+
+
+type AuthUser = { id: string; email: string; name: string };
+
+const authSecret = process.env.AUTH_SECRET;
+const authDbAvailable = Boolean(process.env.POSTGRES_URL || process.env.DATABASE_URL);
+const sessionCookieName = "linh_session";
+const memoryUsers = new Map<string, { id: string; email: string; name: string; passwordHash: string; salt: string }>();
+const memorySessions = new Map<string, string>();
+
+function normalizeEmail(email: string) {
+  return email.trim().toLowerCase();
+}
+
+function getDbUrlConfigured() {
+  return authDbAvailable;
+}
+
+function hashSessionToken(token: string) {
+  return createHmac("sha256", authSecret || "development-only-secret").update(token).digest("hex");
+}
+
+function hashPassword(password: string, salt: string) {
+  return new Promise<string>((resolve, reject) => {
+    scrypt(password, salt, 64, (err, derivedKey) => {
+      if (err) reject(err);
+      else resolve(derivedKey.toString("hex"));
+    });
+  });
+}
+
+async function ensureAuthDb() {
+  if (!authDbAvailable) return;
+  await sql`CREATE TABLE IF NOT EXISTS linh_users (
+    id TEXT PRIMARY KEY,
+    email TEXT NOT NULL UNIQUE,
+    name TEXT NOT NULL,
+    password_hash TEXT NOT NULL,
+    password_salt TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`;
+  await sql`CREATE TABLE IF NOT EXISTS linh_sessions (
+    token_hash TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES linh_users(id) ON DELETE CASCADE,
+    expires_at TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`;
+  await sql`CREATE INDEX IF NOT EXISTS linh_sessions_user_idx ON linh_sessions(user_id)`;
+}
+
+function readSessionToken(req: express.Request) {
+  const cookie = req.headers.cookie || "";
+  const match = cookie.split(";").map((v) => v.trim()).find((v) => v.startsWith(sessionCookieName + "="));
+  return match ? decodeURIComponent(match.slice(sessionCookieName.length + 1)) : "";
+}
+
+async function createSession(userId: string) {
+  const token = randomBytes(32).toString("base64url");
+  const tokenHash = hashSessionToken(token);
+  if (authDbAvailable) {
+    await sql`INSERT INTO linh_sessions (token_hash, user_id, expires_at) VALUES (${tokenHash}, ${userId}, NOW() + INTERVAL '30 days')`;
+  } else {
+    memorySessions.set(tokenHash, userId);
+  }
+  return token;
+}
+
+function setSessionCookie(res: express.Response, token: string) {
+  const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
+  res.setHeader("Set-Cookie", `${sessionCookieName}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=2592000${secure}`);
+}
+
+async function getAuthUser(req: express.Request): Promise<AuthUser | null> {
+  const token = readSessionToken(req);
+  if (!token) return null;
+  const tokenHash = hashSessionToken(token);
+
+  if (authDbAvailable) {
+    const result = await sql<AuthUser>`SELECT u.id, u.email, u.name
+      FROM linh_sessions s JOIN linh_users u ON u.id = s.user_id
+      WHERE s.token_hash = ${tokenHash} AND s.expires_at > NOW() LIMIT 1`;
+    return result.rows[0] || null;
+  }
+
+  const userId = memorySessions.get(tokenHash);
+  if (!userId) return null;
+  for (const user of memoryUsers.values()) {
+    if (user.id === userId) return { id: user.id, email: user.email, name: user.name };
+  }
+  return null;
+}
+
+async function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
+  try {
+    const user = await getAuthUser(req);
+    if (!user) {
+      res.status(401).json({ error: "Bạn cần đăng nhập để sử dụng Linh." });
+      return;
+    }
+    (req as any).authUser = user;
+    next();
+  } catch (error: any) {
+    console.error("Auth lookup failed:", error?.message || error);
+    res.status(500).json({ error: "Không thể kiểm tra phiên đăng nhập." });
+  }
+}
+
+function validateCredentials(email: string, password: string) {
+  const normalized = normalizeEmail(email);
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) return "Email không hợp lệ.";
+  if (password.length < 8) return "Mật khẩu cần tối thiểu 8 ký tự.";
+  return null;
+}
+
+app.get("/api/auth/me", async (req, res) => {
+  try {
+    const user = await getAuthUser(req);
+    res.json({ authenticated: Boolean(user), user });
+  } catch (error: any) {
+    console.error("Auth /me failed:", error?.message || error);
+    res.status(500).json({ error: "Không thể kiểm tra tài khoản." });
+  }
+});
+
+app.post("/api/auth/register", async (req, res) => {
+  try {
+    if (process.env.NODE_ENV === "production" && !authSecret) {
+      res.status(500).json({ error: "Thiếu AUTH_SECRET trên môi trường production." });
+      return;
+    }
+    if (process.env.NODE_ENV === "production" && !getDbUrlConfigured()) {
+      res.status(503).json({ error: "Hệ thống tài khoản chưa được kết nối cơ sở dữ liệu. Hãy cấu hình POSTGRES_URL." });
+      return;
+    }
+    const { name = "", email = "", password = "" } = req.body || {};
+    const credentialError = validateCredentials(email, password);
+    if (credentialError) { res.status(400).json({ error: credentialError }); return; }
+    const cleanName = String(name).trim();
+    if (cleanName.length < 2 || cleanName.length > 80) { res.status(400).json({ error: "Tên hiển thị cần từ 2 đến 80 ký tự." }); return; }
+    const normalizedEmail = normalizeEmail(email);
+
+    const salt = randomBytes(16).toString("hex");
+    const passwordHash = await hashPassword(password, salt);
+    const id = randomUUID();
+
+    if (authDbAvailable) {
+      const existing = await sql`SELECT id FROM linh_users WHERE email = ${normalizedEmail} LIMIT 1`;
+      if (existing.rows.length) { res.status(409).json({ error: "Email này đã được đăng ký." }); return; }
+      await sql`INSERT INTO linh_users (id, email, name, password_hash, password_salt) VALUES (${id}, ${normalizedEmail}, ${cleanName}, ${passwordHash}, ${salt})`;
+    } else {
+      if (memoryUsers.has(normalizedEmail)) { res.status(409).json({ error: "Email này đã được đăng ký." }); return; }
+      memoryUsers.set(normalizedEmail, { id, email: normalizedEmail, name: cleanName, passwordHash, salt });
+    }
+
+    const token = await createSession(id);
+    setSessionCookie(res, token);
+    res.status(201).json({ user: { id, email: normalizedEmail, name: cleanName } });
+  } catch (error: any) {
+    console.error("Register failed:", error?.message || error);
+    res.status(500).json({ error: "Không thể tạo tài khoản. Vui lòng thử lại." });
+  }
+});
+
+app.post("/api/auth/login", async (req, res) => {
+  try {
+    if (process.env.NODE_ENV === "production" && !authSecret) {
+      res.status(500).json({ error: "Thiếu AUTH_SECRET trên môi trường production." });
+      return;
+    }
+    if (process.env.NODE_ENV === "production" && !getDbUrlConfigured()) {
+      res.status(503).json({ error: "Hệ thống tài khoản chưa được kết nối cơ sở dữ liệu. Hãy cấu hình POSTGRES_URL." });
+      return;
+    }
+    const { email = "", password = "" } = req.body || {};
+    const credentialError = validateCredentials(email, password);
+    if (credentialError) { res.status(400).json({ error: credentialError }); return; }
+    const normalizedEmail = normalizeEmail(email);
+
+    let user: { id: string; email: string; name: string; passwordHash: string; salt: string } | null = null;
+    if (authDbAvailable) {
+      const result = await sql<{ id: string; email: string; name: string; password_hash: string; password_salt: string }>`SELECT id, email, name, password_hash, password_salt FROM linh_users WHERE email = ${normalizedEmail} LIMIT 1`;
+      const row = result.rows[0];
+      if (row) user = { id: row.id, email: row.email, name: row.name, passwordHash: row.password_hash, salt: row.password_salt };
+    } else {
+      user = memoryUsers.get(normalizedEmail) || null;
+    }
+
+    if (!user) { res.status(401).json({ error: "Email hoặc mật khẩu chưa đúng." }); return; }
+    const passwordHash = await hashPassword(password, user.salt);
+    if (passwordHash !== user.passwordHash) { res.status(401).json({ error: "Email hoặc mật khẩu chưa đúng." }); return; }
+
+    const token = await createSession(user.id);
+    setSessionCookie(res, token);
+    res.json({ user: { id: user.id, email: user.email, name: user.name } });
+  } catch (error: any) {
+    console.error("Login failed:", error?.message || error);
+    res.status(500).json({ error: "Không thể đăng nhập. Vui lòng thử lại." });
+  }
+});
+
+app.post("/api/auth/logout", async (req, res) => {
+  try {
+    const token = readSessionToken(req);
+    if (token) {
+      const tokenHash = hashSessionToken(token);
+      if (authDbAvailable) await sql`DELETE FROM linh_sessions WHERE token_hash = ${tokenHash}`;
+      else memorySessions.delete(tokenHash);
+    }
+    res.setHeader("Set-Cookie", `${sessionCookieName}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`);
+    res.json({ ok: true });
+  } catch (error: any) {
+    res.status(500).json({ error: "Không thể đăng xuất." });
+  }
+});
+
+
 
 // Initialize Google GenAI if valid key is present
 const apiKey = process.env.GEMINI_API_KEY;
@@ -313,7 +531,7 @@ function formatRollingHistory(history: Array<{ role: string; content: string }>,
 }
 
 // POST /api/tutor/respond (Standard Fast JSON Endpoint)
-app.post("/api/tutor/respond", async (req, res) => {
+app.post("/api/tutor/respond", requireAuth, async (req, res) => {
   const startTime = Date.now();
   try {
     const {
@@ -420,7 +638,7 @@ Respond strictly as JSON matching student level ${level}.`;
 });
 
 // POST /api/tutor/respond-stream (Streaming Endpoint for ultra-low first token latency)
-app.post("/api/tutor/respond-stream", async (req, res) => {
+app.post("/api/tutor/respond-stream", requireAuth, async (req, res) => {
   const startTime = Date.now();
   const {
     message,
@@ -619,7 +837,7 @@ Output:`;
 });
 
 // POST /api/tutor/tts
-app.post("/api/tutor/tts", async (req, res) => {
+app.post("/api/tutor/tts", requireAuth, async (req, res) => {
   const startTime = Date.now();
   try {
     const { text } = req.body;
@@ -692,6 +910,8 @@ if (process.env.NODE_ENV !== "production") {
     res.sendFile(path.join(__dirname, "dist", "index.html"));
   });
 }
+
+void ensureAuthDb().catch((error) => console.error("Auth database initialization failed:", error?.message || error));
 
 const PORT = Number(process.env.PORT) || 3000;
 app.listen(PORT, "0.0.0.0", () => {
