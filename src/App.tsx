@@ -339,7 +339,6 @@ export default function App() {
       setTutorState('IDLE');
     } else {
       stopAudioSpeech();
-      setActiveChineseSnippet('');
 
       setIsMicActive(true);
       setTutorState('LISTENING');
@@ -376,8 +375,7 @@ export default function App() {
     if (!isSpeakerMuted) {
       stopAudioSpeech();
       setIsSpeakerMuted(true);
-      setActiveChineseSnippet('');
-    } else {
+      } else {
       setIsSpeakerMuted(false);
     }
   };
