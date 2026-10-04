@@ -27,11 +27,28 @@ export default function App() {
   const [authChecking, setAuthChecking] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
+    const timeout = window.setTimeout(() => {
+      if (!cancelled) setAuthChecking(false);
+    }, 3500);
+
     fetch('/api/auth/me', { credentials: 'include' })
       .then(async (r) => r.ok ? r.json() : ({ authenticated: false }))
-      .then((data) => setAuthUser(data.user || null))
-      .catch(() => setAuthUser(null))
-      .finally(() => setAuthChecking(false));
+      .then((data) => {
+        if (!cancelled) setAuthUser(data.user || null);
+      })
+      .catch(() => {
+        if (!cancelled) setAuthUser(null);
+      })
+      .finally(() => {
+        if (!cancelled) setAuthChecking(false);
+        window.clearTimeout(timeout);
+      });
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeout);
+    };
   }, []);
 
   const handleLogout = async () => {
@@ -52,13 +69,19 @@ export default function App() {
 
   // Settings & Dynamic HSK Level (Zero hardcoded HSK 2 default!)
   const [speechRate, setSpeechRate] = useState(0.9);
-  const [hskLevel, setHskLevel] = useState<HskLevel>(() => {
-    const saved = localStorage.getItem('ai_tutor_user_hsk_level:' + (authUser?.id || 'guest')) as HskLevel;
-    if (saved && ['HSK 1', 'HSK 2', 'HSK 3', 'HSK 4', 'HSK 5', 'HSK 6'].includes(saved)) {
-      return saved;
+  const [hskLevel, setHskLevel] = useState<HskLevel>('HSK 1');
+
+  useEffect(() => {
+    if (!authUser?.id) return;
+    try {
+      const saved = window.localStorage.getItem('ai_tutor_user_hsk_level:' + authUser.id) as HskLevel;
+      if (saved && ['HSK 1', 'HSK 2', 'HSK 3', 'HSK 4', 'HSK 5', 'HSK 6'].includes(saved)) {
+        setHskLevel(saved);
+      }
+    } catch {
+      // Ignore storage restrictions; the tutor remains usable.
     }
-    return 'HSK 1';
-  });
+  }, [authUser?.id]);
   const [showVietnameseSubtitle, setShowVietnameseSubtitle] = useState(true);
 
   // Audio & Mic controls
@@ -416,7 +439,13 @@ export default function App() {
   // Dynamic Level Switching (HSK 1 - 6)
   const handleSelectHskLevel = (lvl: HskLevel) => {
     setHskLevel(lvl);
-    if (authUser?.id) localStorage.setItem('ai_tutor_user_hsk_level:' + authUser.id, lvl);
+    if (authUser?.id) {
+      try {
+        window.localStorage.setItem('ai_tutor_user_hsk_level:' + authUser.id, lvl);
+      } catch {
+        // Ignore storage restrictions.
+      }
+    }
 
     const activeProfile = getHskProfile(lvl);
     const activeTopicDef = getTopic(lvl);
