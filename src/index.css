@@ -116,6 +116,7 @@
   .animate-tutor-listening-presence,
   .animate-tutor-idle-presence,
   .animate-lip-sync-soft,
+  .animate-lip-sync-reactive,
   .animate-eye-drift,
   .animate-eye-drift-delayed,
   .animate-audio-presence {
