@@ -5,14 +5,16 @@ import { TutorState } from '../types';
 interface TalkingAvatarProps {
   tutorState: TutorState;
   className?: string;
+  audioLevel?: number;
 }
 
-export const TalkingAvatar: React.FC<TalkingAvatarProps> = ({ tutorState, className = '' }) => {
+export const TalkingAvatar: React.FC<TalkingAvatarProps> = ({ tutorState, className = '', audioLevel = 0 }) => {
+  const level = Math.max(0, Math.min(1, audioLevel));
   const speaking = tutorState === 'AI_SPEAKING';
   const listening = tutorState === 'LISTENING';
 
   return (
-    <div className={`relative w-full h-full overflow-hidden bg-white ${className}`}>
+    <div className={`relative w-full h-full overflow-hidden bg-white ${className}`} style={{ '--avatar-audio-level': level } as React.CSSProperties}>
       <div
         className={`absolute inset-0 origin-[50%_38%] transition-transform duration-700 will-change-transform ${
           speaking
@@ -45,8 +47,10 @@ export const TalkingAvatar: React.FC<TalkingAvatarProps> = ({ tutorState, classN
 
         {speaking && (
           <>
-            {/* Audio-reactive illusion: a very soft lower-face pulse rather than a hard drawn mouth. */}
-            <div className="absolute left-1/2 top-[40%] -translate-x-1/2 w-[8%] h-[2.2%] rounded-[50%] border border-[#6b2330]/20 bg-[#6b2330]/10 animate-lip-sync-soft" />
+            <div
+              className="absolute left-1/2 top-[40%] -translate-x-1/2 w-[7.5%] h-[2.1%] rounded-[50%] border border-[#6b2330]/15 bg-[#6b2330]/10 animate-lip-sync-reactive"
+              aria-hidden="true"
+            />
             <div className="absolute inset-x-[12%] bottom-[5%] h-20 rounded-full bg-[#3F6FF5]/7 blur-2xl animate-audio-presence" />
           </>
         )}
