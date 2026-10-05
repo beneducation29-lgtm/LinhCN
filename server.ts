@@ -163,7 +163,7 @@ app.post("/api/auth/register", async (req, res) => {
       res.status(503).json({ error: "Hệ thống tài khoản chưa được kết nối cơ sở dữ liệu. Hãy cấu hình POSTGRES_URL." });
       return;
     }
-    if (authDbAvailable) await authDbInitialization;
+    if (authDbAvailable) await initAuthDb();
     const { name = "", email = "", password = "" } = req.body || {};
     const credentialError = validateCredentials(email, password);
     if (credentialError) { res.status(400).json({ error: credentialError }); return; }
@@ -189,21 +189,22 @@ app.post("/api/auth/register", async (req, res) => {
     res.status(201).json({ user: { id, email: normalizedEmail, name: cleanName } });
   } catch (error: any) {
     console.error("Register failed:", error?.message || error);
+    const message = error?.message || "";
+    if (/POSTGRES|database|relation|connect|connection|ECONN|ENOTFOUND|timeout/i.test(message)) {
+      res.status(503).json({ error: "Cơ sở dữ liệu tài khoản chưa sẵn sàng. Vui lòng kiểm tra cấu hình Postgres trên Vercel." });
+      return;
+    }
     res.status(500).json({ error: "Không thể tạo tài khoản. Vui lòng thử lại." });
   }
 });
 
 app.post("/api/auth/login", async (req, res) => {
   try {
-    if (process.env.NODE_ENV === "production" && !authSecret) {
-      res.status(500).json({ error: "Thiếu AUTH_SECRET trên môi trường production." });
-      return;
-    }
     if (process.env.NODE_ENV === "production" && !getDbUrlConfigured()) {
       res.status(503).json({ error: "Hệ thống tài khoản chưa được kết nối cơ sở dữ liệu. Hãy cấu hình POSTGRES_URL." });
       return;
     }
-    if (authDbAvailable) await authDbInitialization;
+    if (authDbAvailable) await initAuthDb();
     const { email = "", password = "" } = req.body || {};
     const credentialError = validateCredentials(email, password);
     if (credentialError) { res.status(400).json({ error: credentialError }); return; }
@@ -227,13 +228,18 @@ app.post("/api/auth/login", async (req, res) => {
     res.json({ user: { id: user.id, email: user.email, name: user.name } });
   } catch (error: any) {
     console.error("Login failed:", error?.message || error);
+    const message = error?.message || "";
+    if (/POSTGRES|database|relation|connect|connection|ECONN|ENOTFOUND|timeout/i.test(message)) {
+      res.status(503).json({ error: "Cơ sở dữ liệu tài khoản chưa sẵn sàng. Vui lòng kiểm tra cấu hình Postgres trên Vercel." });
+      return;
+    }
     res.status(500).json({ error: "Không thể đăng nhập. Vui lòng thử lại." });
   }
 });
 
 app.post("/api/auth/logout", async (req, res) => {
   try {
-    if (authDbAvailable) await authDbInitialization;
+    if (authDbAvailable) await initAuthDb();
     const token = readSessionToken(req);
     if (token) {
       const tokenHash = hashSessionToken(token);
