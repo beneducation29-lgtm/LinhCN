@@ -1,5 +1,6 @@
 import { GoogleGenAI, Type } from "@google/genai";
-// Loaded dynamically after Postgres environment variables are normalized below.\nlet sql: typeof import("@vercel/postgres").sql;
+// Loaded dynamically after Postgres environment variables are normalized below.
+let sql: typeof import("@vercel/postgres").sql;
 import { createHmac, randomBytes, randomUUID, scrypt } from "node:crypto";
 import dotenv from "dotenv";
 import express from "express";
@@ -15,7 +16,11 @@ const databaseUrl =
   process.env.DATABASE_URL ||
   process.env.POSTGRES_URL_NON_POOLING ||
   "";
-if (databaseUrl && !process.env.POSTGRES_URL) process.env.POSTGRES_URL = databaseUrl;\n\n// @vercel/postgres reads connection settings when the module is loaded.\n// Import it only after Neon/Vercel connection variables are normalized.\n({ sql } = await import("@vercel/postgres"));
+if (databaseUrl && !process.env.POSTGRES_URL) process.env.POSTGRES_URL = databaseUrl;
+
+// @vercel/postgres reads connection settings when the module is loaded.
+// Import it only after Neon/Vercel connection variables are normalized.
+({ sql } = await import("@vercel/postgres"));
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
