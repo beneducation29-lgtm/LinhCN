@@ -18,7 +18,7 @@ app.use(express.json({ limit: "15mb" }));
 type AuthUser = { id: string; email: string; name: string };
 
 const authSecret = process.env.AUTH_SECRET;
-const authDbAvailable = Boolean(process.env.POSTGRES_URL || process.env.DATABASE_URL);
+const authDbAvailable = Boolean(process.env.POSTGRES_URL);
 const sessionCookieName = "linh_session";
 const memoryUsers = new Map<string, { id: string; email: string; name: string; passwordHash: string; salt: string }>();
 const memorySessions = new Map<string, string>();
@@ -62,6 +62,8 @@ async function ensureAuthDb() {
   )`;
   await sql`CREATE INDEX IF NOT EXISTS linh_sessions_user_idx ON linh_sessions(user_id)`;
 }
+
+const authDbInitialization = ensureAuthDb();
 
 function readSessionToken(req: express.Request) {
   const cookie = req.headers.cookie || "";
@@ -107,6 +109,7 @@ async function getAuthUser(req: express.Request): Promise<AuthUser | null> {
 
 async function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
   try {
+    if (authDbAvailable) await authDbInitialization;
     const user = await getAuthUser(req);
     if (!user) {
       res.status(401).json({ error: "Bạn cần đăng nhập để sử dụng Linh." });
@@ -147,6 +150,7 @@ app.post("/api/auth/register", async (req, res) => {
       res.status(503).json({ error: "Hệ thống tài khoản chưa được kết nối cơ sở dữ liệu. Hãy cấu hình POSTGRES_URL." });
       return;
     }
+    if (authDbAvailable) await authDbInitialization;
     const { name = "", email = "", password = "" } = req.body || {};
     const credentialError = validateCredentials(email, password);
     if (credentialError) { res.status(400).json({ error: credentialError }); return; }
@@ -186,6 +190,7 @@ app.post("/api/auth/login", async (req, res) => {
       res.status(503).json({ error: "Hệ thống tài khoản chưa được kết nối cơ sở dữ liệu. Hãy cấu hình POSTGRES_URL." });
       return;
     }
+    if (authDbAvailable) await authDbInitialization;
     const { email = "", password = "" } = req.body || {};
     const credentialError = validateCredentials(email, password);
     if (credentialError) { res.status(400).json({ error: credentialError }); return; }
@@ -215,6 +220,7 @@ app.post("/api/auth/login", async (req, res) => {
 
 app.post("/api/auth/logout", async (req, res) => {
   try {
+    if (authDbAvailable) await authDbInitialization;
     const token = readSessionToken(req);
     if (token) {
       const tokenHash = hashSessionToken(token);
@@ -911,7 +917,7 @@ if (process.env.NODE_ENV !== "production") {
   });
 }
 
-void ensureAuthDb().catch((error) => console.error("Auth database initialization failed:", error?.message || error));
+
 
 const PORT = Number(process.env.PORT) || 3000;
 if (process.env.VERCEL !== "1") {
