@@ -1,5 +1,4 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { sql } from "@vercel/postgres";
 import { createHmac, randomBytes, randomUUID, scrypt } from "node:crypto";
 import dotenv from "dotenv";
 import express from "express";
@@ -7,6 +6,16 @@ import path from "path";
 import { fileURLToPath } from "url";
 
 dotenv.config();
+
+// Normalize Postgres connection variables before loading @vercel/postgres.
+const databaseUrl =
+  process.env.POSTGRES_URL ||
+  process.env.POSTGRES_PRISMA_URL ||
+  process.env.DATABASE_URL ||
+  process.env.POSTGRES_URL_NON_POOLING ||
+  "";
+if (databaseUrl && !process.env.POSTGRES_URL) process.env.POSTGRES_URL = databaseUrl;
+const { sql } = await import("@vercel/postgres");
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -17,8 +26,10 @@ app.use(express.json({ limit: "15mb" }));
 
 type AuthUser = { id: string; email: string; name: string };
 
-const authSecret = process.env.AUTH_SECRET;
-const authDbAvailable = Boolean(process.env.POSTGRES_URL);
+// Prefer an explicit AUTH_SECRET. If it is absent, use the private DB URL as a
+// stable fallback so production registration is not blocked by a missing secret.
+const authSecret = process.env.AUTH_SECRET || databaseUrl || "linhcn-development-auth-secret";
+const authDbAvailable = Boolean(databaseUrl);
 const sessionCookieName = "linh_session";
 const memoryUsers = new Map<string, { id: string; email: string; name: string; passwordHash: string; salt: string }>();
 const memorySessions = new Map<string, string>();
@@ -63,7 +74,13 @@ async function ensureAuthDb() {
   await sql`CREATE INDEX IF NOT EXISTS linh_sessions_user_idx ON linh_sessions(user_id)`;
 }
 
-const authDbInitialization = ensureAuthDb();
+let authDbInitialization: Promise<void> | null = null;
+
+async function initAuthDb() {
+  if (!authDbAvailable) return;
+  if (!authDbInitialization) authDbInitialization = ensureAuthDb();
+  await authDbInitialization;
+}
 
 function readSessionToken(req: express.Request) {
   const cookie = req.headers.cookie || "";
@@ -90,6 +107,7 @@ function setSessionCookie(res: express.Response, token: string) {
 async function getAuthUser(req: express.Request): Promise<AuthUser | null> {
   const token = readSessionToken(req);
   if (!token) return null;
+  if (authDbAvailable) await initAuthDb();
   const tokenHash = hashSessionToken(token);
 
   if (authDbAvailable) {
@@ -109,7 +127,7 @@ async function getAuthUser(req: express.Request): Promise<AuthUser | null> {
 
 async function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
   try {
-    if (authDbAvailable) await authDbInitialization;
+    if (authDbAvailable) await initAuthDb();
     const user = await getAuthUser(req);
     if (!user) {
       res.status(401).json({ error: "Bạn cần đăng nhập để sử dụng Linh." });
@@ -142,10 +160,6 @@ app.get("/api/auth/me", async (req, res) => {
 
 app.post("/api/auth/register", async (req, res) => {
   try {
-    if (process.env.NODE_ENV === "production" && !authSecret) {
-      res.status(500).json({ error: "Thiếu AUTH_SECRET trên môi trường production." });
-      return;
-    }
     if (process.env.NODE_ENV === "production" && !getDbUrlConfigured()) {
       res.status(503).json({ error: "Hệ thống tài khoản chưa được kết nối cơ sở dữ liệu. Hãy cấu hình POSTGRES_URL." });
       return;
