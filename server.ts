@@ -24,7 +24,14 @@ if (databaseUrl && !process.env.POSTGRES_URL) process.env.POSTGRES_URL = databas
 // Only import it when a database URL is actually configured. This keeps
 // /api/auth/me and the auth endpoints healthy even before Postgres is added.
 if (databaseUrl) {
-  ({ sql } = await import("@vercel/postgres"));
+  try {
+    ({ sql } = await import("@vercel/postgres"));
+  } catch (error: any) {
+    // A broken/missing Postgres integration must not crash the whole
+    // serverless function. Auth will temporarily use the in-process fallback.
+    console.error("Postgres adapter initialization failed:", error?.message || error);
+    sql = null;
+  }
 }
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -48,7 +55,7 @@ function normalizeEmail(email: string) {
 }
 
 function getDbUrlConfigured() {
-  return authDbAvailable;
+  return Boolean(databaseUrl && sql);
 }
 
 function hashSessionToken(token: string) {
