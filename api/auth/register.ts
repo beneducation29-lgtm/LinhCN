@@ -1,6 +1,5 @@
-import handler from "../[...path]";
+import authHandler from "./_handler.js";
 
 export default function authRegister(req: any, res: any) {
-  req.url = "/api/auth/register";
-  return handler(req, res);
+  return authHandler(req, res, "/api/auth/register");
 }

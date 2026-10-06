@@ -25,6 +25,14 @@ interface OtherViewProps {
   onGoToSpeakingRoom: () => void;
   onPracticeWord?: (word: string) => void;
   hskLevel?: HskLevel;
+  learningProfile?: {
+    hsk_level: string;
+    fluency_score: number;
+    conversations_completed: number;
+    user_messages: number;
+    vocabulary_used: number;
+    practice_minutes: number;
+  };
 }
 
 export const OtherView: React.FC<OtherViewProps> = ({
@@ -32,6 +40,14 @@ export const OtherView: React.FC<OtherViewProps> = ({
   onGoToSpeakingRoom,
   onPracticeWord,
   hskLevel = 'HSK 1',
+  learningProfile = {
+    hsk_level: 'HSK 1',
+    fluency_score: 0,
+    conversations_completed: 0,
+    user_messages: 0,
+    vocabulary_used: 0,
+    practice_minutes: 0,
+  },
 }) => {
   const [selectedLevel, setSelectedLevel] = useState<HskLevel>(hskLevel);
   const [searchQuery, setSearchQuery] = useState('');
@@ -114,8 +130,8 @@ export const OtherView: React.FC<OtherViewProps> = ({
               <CheckCircle2 className="w-5 h-5" />
             </div>
             <div>
-              <span className="text-[11px] font-semibold text-[#6B83AD] uppercase">Đã thành thạo</span>
-              <div className="text-[20px] font-bold text-[#183B78]">73 từ</div>
+              <span className="text-[11px] font-semibold text-[#6B83AD] uppercase">Từ đã sử dụng</span>
+              <div className="text-[20px] font-bold text-[#183B78]">{learningProfile.vocabulary_used} từ</div>
             </div>
           </div>
 
@@ -124,8 +140,8 @@ export const OtherView: React.FC<OtherViewProps> = ({
               <Clock className="w-5 h-5" />
             </div>
             <div>
-              <span className="text-[11px] font-semibold text-[#6B83AD] uppercase">Đang luyện tập</span>
-              <div className="text-[20px] font-bold text-[#183B78]">34 từ</div>
+              <span className="text-[11px] font-semibold text-[#6B83AD] uppercase">Câu đã luyện nói</span>
+              <div className="text-[20px] font-bold text-[#183B78]">{learningProfile.user_messages} câu</div>
             </div>
           </div>
 
@@ -134,8 +150,8 @@ export const OtherView: React.FC<OtherViewProps> = ({
               <AlertCircle className="w-5 h-5" />
             </div>
             <div>
-              <span className="text-[11px] font-semibold text-[#6B83AD] uppercase">Cần ôn lại</span>
-              <div className="text-[20px] font-bold text-[#183B78]">18 từ</div>
+              <span className="text-[11px] font-semibold text-[#6B83AD] uppercase">Thời gian học</span>
+              <div className="text-[20px] font-bold text-[#183B78]">{learningProfile.practice_minutes} phút</div>
             </div>
           </div>
 
@@ -467,9 +483,9 @@ export const OtherView: React.FC<OtherViewProps> = ({
             <span className="text-[12px] font-semibold uppercase">Độ lưu loát & phản xạ</span>
             <TrendingUp className="w-4 h-4 text-emerald-500" />
           </div>
-          <div className="text-[28px] font-bold text-[#183B78] mt-2">88/100</div>
-          <p className="text-[12px] text-emerald-600 font-medium mt-1">
-            +12% so với tuần trước
+          <div className="text-[28px] font-bold text-[#183B78] mt-2">{learningProfile.fluency_score}/100</div>
+          <p className="text-[12px] text-[#6B83AD] font-medium mt-1">
+            Tính từ hoạt động luyện nói thực tế của bạn
           </p>
         </div>
 
@@ -489,7 +505,7 @@ export const OtherView: React.FC<OtherViewProps> = ({
             <span className="text-[12px] font-semibold uppercase">Hội thoại hoàn thành</span>
             <Award className="w-4 h-4 text-amber-500" />
           </div>
-          <div className="text-[28px] font-bold text-[#183B78] mt-2">24 lượt</div>
+          <div className="text-[28px] font-bold text-[#183B78] mt-2">{learningProfile.conversations_completed} lượt</div>
           <p className="text-[12px] text-[#6B83AD] font-medium mt-1">
             Cấp độ hiện tại: {selectedLevel}
           </p>
@@ -501,8 +517,9 @@ export const OtherView: React.FC<OtherViewProps> = ({
           Gợi ý luyện tập cá nhân hóa hôm nay:
         </h3>
         <p className="text-[13.5px] text-[#6B83AD] leading-relaxed">
-          Bạn đang sử dụng rất tốt các mẫu câu so sánh với <code className="text-[#3F6FF5] bg-[#EAF1FF] px-1.5 py-0.5 rounded font-mono font-semibold">比较</code> và câu nguyên nhân <code className="text-[#3F6FF5] bg-[#EAF1FF] px-1.5 py-0.5 rounded font-mono font-semibold">因为...所以...</code>.
-          Hãy tiếp tục luyện thêm phản xạ với hành động song song <code className="text-[#3F6FF5] bg-[#EAF1FF] px-1.5 py-0.5 rounded font-mono font-semibold">一边...一边...</code> trong buổi nói tới cùng cô Linh!
+          {learningProfile.user_messages === 0
+            ? 'Bạn chưa có dữ liệu luyện nói. Hãy bắt đầu một cuộc hội thoại với cô Linh để hệ thống ghi nhận tiến bộ của riêng bạn.'
+            : `Bạn đã luyện nói ${learningProfile.user_messages} câu và sử dụng ${learningProfile.vocabulary_used} từ trong các phiên học. Hãy tiếp tục luyện để dữ liệu tiến bộ được cập nhật theo thời gian thực.`}
         </p>
 
         <div className="pt-2">

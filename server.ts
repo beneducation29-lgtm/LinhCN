@@ -272,6 +272,90 @@ app.post("/api/auth/logout", async (req, res) => {
 
 
 
+// Per-student learning profile: persisted in Postgres and never seeded with fake progress.
+async function ensureLearningDb() {
+  if (!authDbAvailable || !sql) return;
+  await initAuthDb();
+  await sql`CREATE TABLE IF NOT EXISTS linh_learning_profiles (
+    user_id TEXT PRIMARY KEY REFERENCES linh_users(id) ON DELETE CASCADE,
+    hsk_level TEXT NOT NULL DEFAULT 'HSK 1',
+    fluency_score INTEGER NOT NULL DEFAULT 0,
+    conversations_completed INTEGER NOT NULL DEFAULT 0,
+    user_messages INTEGER NOT NULL DEFAULT 0,
+    vocabulary_used INTEGER NOT NULL DEFAULT 0,
+    practice_minutes INTEGER NOT NULL DEFAULT 0,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`;
+}
+
+async function getLearningProfile(userId: string) {
+  await ensureLearningDb();
+  if (authDbAvailable && sql) {
+    const result = await sql`SELECT user_id, hsk_level, fluency_score, conversations_completed, user_messages, vocabulary_used, practice_minutes, updated_at
+      FROM linh_learning_profiles WHERE user_id = ${userId} LIMIT 1`;
+    if (result.rows[0]) return result.rows[0];
+    await sql`INSERT INTO linh_learning_profiles (user_id) VALUES (${userId}) ON CONFLICT (user_id) DO NOTHING`;
+    const created = await sql`SELECT user_id, hsk_level, fluency_score, conversations_completed, user_messages, vocabulary_used, practice_minutes, updated_at
+      FROM linh_learning_profiles WHERE user_id = ${userId} LIMIT 1`;
+    return created.rows[0];
+  }
+  return {
+    user_id: userId,
+    hsk_level: 'HSK 1',
+    fluency_score: 0,
+    conversations_completed: 0,
+    user_messages: 0,
+    vocabulary_used: 0,
+    practice_minutes: 0,
+  };
+}
+
+app.get("/api/learning/profile", requireAuth, async (req, res) => {
+  try {
+    const profile = await getLearningProfile((req as any).authUser.id);
+    res.json({ profile });
+  } catch (error: any) {
+    console.error("Learning profile load failed:", error?.message || error);
+    res.status(503).json({ error: "Không thể tải dữ liệu học tập của tài khoản." });
+  }
+});
+
+app.post("/api/learning/profile", requireAuth, async (req, res) => {
+  try {
+    const userId = (req as any).authUser.id;
+    const current = await getLearningProfile(userId);
+    const body = req.body || {};
+    const next = {
+      hskLevel: typeof body.hskLevel === "string" ? body.hskLevel : current.hsk_level,
+      fluencyScore: Math.max(0, Math.min(100, Number(body.fluencyScore ?? current.fluency_score) || 0)),
+      conversationsCompleted: Math.max(0, Number(body.conversationsCompleted ?? current.conversations_completed) || 0),
+      userMessages: Math.max(0, Number(body.userMessages ?? current.user_messages) || 0),
+      vocabularyUsed: Math.max(0, Number(body.vocabularyUsed ?? current.vocabulary_used) || 0),
+      practiceMinutes: Math.max(0, Number(body.practiceMinutes ?? current.practice_minutes) || 0),
+    };
+
+    await ensureLearningDb();
+    if (authDbAvailable && sql) {
+      await sql`INSERT INTO linh_learning_profiles
+        (user_id, hsk_level, fluency_score, conversations_completed, user_messages, vocabulary_used, practice_minutes, updated_at)
+        VALUES (${userId}, ${next.hskLevel}, ${next.fluencyScore}, ${next.conversationsCompleted}, ${next.userMessages}, ${next.vocabularyUsed}, ${next.practiceMinutes}, NOW())
+        ON CONFLICT (user_id) DO UPDATE SET
+          hsk_level = EXCLUDED.hsk_level,
+          fluency_score = EXCLUDED.fluency_score,
+          conversations_completed = EXCLUDED.conversations_completed,
+          user_messages = EXCLUDED.user_messages,
+          vocabulary_used = EXCLUDED.vocabulary_used,
+          practice_minutes = EXCLUDED.practice_minutes,
+          updated_at = NOW()`;
+    }
+
+    res.json({ profile: { ...current, user_id: userId, hsk_level: next.hskLevel, fluency_score: next.fluencyScore, conversations_completed: next.conversationsCompleted, user_messages: next.userMessages, vocabulary_used: next.vocabularyUsed, practice_minutes: next.practiceMinutes } });
+  } catch (error: any) {
+    console.error("Learning profile save failed:", error?.message || error);
+    res.status(503).json({ error: "Không thể lưu dữ liệu học tập của tài khoản." });
+  }
+});
+
 // Initialize Google GenAI if valid key is present
 const apiKey = process.env.GEMINI_API_KEY;
 let ai: GoogleGenAI | null = null;

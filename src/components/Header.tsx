@@ -34,6 +34,9 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenHskModal,
   onOpenLevelSelector,
   hskLevel = 'HSK 1',
+  userName = 'Học viên',
+  userEmail = '',
+  onLogout,
 }) => {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
 
@@ -103,7 +106,7 @@ export const Header: React.FC<HeaderProps> = ({
             <div className="w-9 h-9 rounded-full overflow-hidden border border-[#DDE8F8] bg-slate-100 shrink-0 shadow-xs">
               <img
                 src={ASSETS.studentTriet}
-                alt="Nguyễn Minh Triết"
+                alt={userName}
                 className="w-full h-full object-cover"
               />
             </div>
@@ -112,7 +115,7 @@ export const Header: React.FC<HeaderProps> = ({
                 Nguyễn Minh Triết
               </div>
               <div className="text-[11.5px] text-[#6B83AD] font-medium leading-tight">
-                Lớp 11
+                {hskLevel}
               </div>
             </div>
             <ChevronDown className="w-4 h-4 text-[#6B83AD] shrink-0" />
@@ -155,7 +158,10 @@ export const Header: React.FC<HeaderProps> = ({
 
               <div className="pt-1 border-t border-[#F0F6FF]">
                 <button
-                  onClick={() => setShowProfileMenu(false)}
+                  onClick={() => {
+                    setShowProfileMenu(false);
+                    onLogout?.();
+                  }}
                   className="w-full px-4 py-2 text-left text-[13px] text-[#F04444] hover:bg-red-50 flex items-center gap-2.5"
                 >
                   <LogOut className="w-4 h-4" />

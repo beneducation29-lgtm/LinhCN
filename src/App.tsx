@@ -25,6 +25,15 @@ export default function App() {
   // Navigation & tabs
   const [authUser, setAuthUser] = useState<{id:string; email:string; name:string} | null>(null);
   const [authChecking, setAuthChecking] = useState(true);
+  const [learningProfile, setLearningProfile] = useState({
+    hsk_level: 'HSK 1',
+    fluency_score: 0,
+    conversations_completed: 0,
+    user_messages: 0,
+    vocabulary_used: 0,
+    practice_minutes: 0,
+  });
+  const sessionStartedAtRef = useRef<number>(Date.now());
 
   useEffect(() => {
     let cancelled = false;
@@ -57,6 +66,19 @@ export default function App() {
     setAuthUser(null);
   };
 
+  const persistLearningProfile = (patch: Partial<typeof learningProfile>) => {
+    setLearningProfile((prev) => {
+      const next = { ...prev, ...patch };
+      fetch('/api/learning/profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(next),
+      }).catch(() => {});
+      return next;
+    });
+  };
+
   const [activeTab, setActiveTab] = useState('speaking');
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
 
@@ -82,6 +104,22 @@ export default function App() {
       // Ignore storage restrictions; the tutor remains usable.
     }
   }, [authUser?.id]);
+  useEffect(() => {
+    if (!authUser?.id) return;
+    sessionStartedAtRef.current = Date.now();
+    fetch('/api/learning/profile', { credentials: 'include' })
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (data?.profile) {
+          setLearningProfile(data.profile);
+          if (data.profile.hsk_level && ['HSK 1', 'HSK 2', 'HSK 3', 'HSK 4', 'HSK 5', 'HSK 6'].includes(data.profile.hsk_level)) {
+            setHskLevel(data.profile.hsk_level as HskLevel);
+          }
+        }
+      })
+      .catch(() => {});
+  }, [authUser?.id]);
+
   const [showVietnameseSubtitle, setShowVietnameseSubtitle] = useState(true);
 
   // Audio & Mic controls
@@ -204,8 +242,19 @@ export default function App() {
     const updatedMessages = [...messages, newUserMsg];
     setMessages(updatedMessages);
 
-    // Track words used from the single source of truth
     const levelVocabs = getRelevantVocab(hskLevel, topic.id);
+    const newlyUsedWords = levelVocabs.filter((v) => userText.includes(v.word)).map((v) => v.word);
+    const nextVocabularyUsed = new Set([...wordsUsedSet, ...newlyUsedWords]).size;
+    const nextUserMessages = learningProfile.user_messages + 1;
+    persistLearningProfile({
+      hsk_level: hskLevel,
+      user_messages: nextUserMessages,
+      vocabulary_used: Math.max(learningProfile.vocabulary_used, nextVocabularyUsed),
+      fluency_score: Math.min(100, nextUserMessages * 3 + Math.max(learningProfile.vocabulary_used, nextVocabularyUsed) * 5),
+      practice_minutes: Math.max(learningProfile.practice_minutes, Math.round((Date.now() - sessionStartedAtRef.current) / 60000)),
+    });
+
+    // Track words used from the single source of truth
     levelVocabs.forEach((v) => {
       if (userText.includes(v.word)) {
         setWordsUsedSet((prev) => new Set(prev).add(v.word));
@@ -363,6 +412,10 @@ export default function App() {
 
       // Check if finished 5 steps -> Show summary celebration
       if (nextStep >= 5 && updatedMessages.length >= 7) {
+        persistLearningProfile({
+          conversations_completed: learningProfile.conversations_completed + 1,
+          practice_minutes: Math.max(learningProfile.practice_minutes, Math.round((Date.now() - sessionStartedAtRef.current) / 60000)),
+        });
         setTimeout(() => {
           setIsSummaryModalOpen(true);
         }, 3200);
@@ -445,6 +498,7 @@ export default function App() {
   const handleSelectHskLevel = (lvl: HskLevel) => {
     setHskLevel(lvl);
     if (authUser?.id) {
+      persistLearningProfile({ hsk_level: lvl });
       try {
         window.localStorage.setItem('ai_tutor_user_hsk_level:' + authUser.id, lvl);
       } catch {
@@ -597,6 +651,7 @@ export default function App() {
                 handleInsertWord(word);
               }}
               hskLevel={hskLevel}
+              learningProfile={learningProfile}
             />
           )}
         </main>
