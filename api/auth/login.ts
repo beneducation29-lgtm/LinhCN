@@ -1,6 +1,6 @@
-import app from "../../server";
+import handler from "../[...path]";
 
-export default function handler(req: any, res: any) {
+export default function authLogin(req: any, res: any) {
   req.url = "/api/auth/login";
-  return app(req, res);
+  return handler(req, res);
 }
