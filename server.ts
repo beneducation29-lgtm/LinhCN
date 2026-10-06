@@ -1,6 +1,8 @@
 import { GoogleGenAI, Type } from "@google/genai";
-// Loaded dynamically after Postgres environment variables are normalized below.
-let sql: typeof import("@vercel/postgres").sql;
+// PostgreSQL is optional at module-load time. Vercel can invoke auth endpoints
+// before database environment variables are configured; do not let the optional
+// dependency crash the entire serverless function during import.
+let sql: typeof import("@vercel/postgres").sql | null = null;
 import { createHmac, randomBytes, randomUUID, scrypt } from "node:crypto";
 import dotenv from "dotenv";
 import express from "express";
@@ -19,8 +21,11 @@ const databaseUrl =
 if (databaseUrl && !process.env.POSTGRES_URL) process.env.POSTGRES_URL = databaseUrl;
 
 // @vercel/postgres reads connection settings when the module is loaded.
-// Import it only after Neon/Vercel connection variables are normalized.
-({ sql } = await import("@vercel/postgres"));
+// Only import it when a database URL is actually configured. This keeps
+// /api/auth/me and the auth endpoints healthy even before Postgres is added.
+if (databaseUrl) {
+  ({ sql } = await import("@vercel/postgres"));
+}
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -60,7 +65,7 @@ function hashPassword(password: string, salt: string) {
 }
 
 async function ensureAuthDb() {
-  if (!authDbAvailable) return;
+  if (!authDbAvailable || !sql) return;
   await sql`CREATE TABLE IF NOT EXISTS linh_users (
     id TEXT PRIMARY KEY,
     email TEXT NOT NULL UNIQUE,
@@ -95,7 +100,7 @@ function readSessionToken(req: express.Request) {
 async function createSession(userId: string) {
   const token = randomBytes(32).toString("base64url");
   const tokenHash = hashSessionToken(token);
-  if (authDbAvailable) {
+  if (authDbAvailable && sql) {
     await sql`INSERT INTO linh_sessions (token_hash, user_id, expires_at) VALUES (${tokenHash}, ${userId}, NOW() + INTERVAL '30 days')`;
   } else {
     memorySessions.set(tokenHash, userId);
@@ -114,7 +119,7 @@ async function getAuthUser(req: express.Request): Promise<AuthUser | null> {
   if (authDbAvailable) await initAuthDb();
   const tokenHash = hashSessionToken(token);
 
-  if (authDbAvailable) {
+  if (authDbAvailable && sql) {
     const result = await sql<AuthUser>`SELECT u.id, u.email, u.name
       FROM linh_sessions s JOIN linh_users u ON u.id = s.user_id
       WHERE s.token_hash = ${tokenHash} AND s.expires_at > NOW() LIMIT 1`;
@@ -180,7 +185,7 @@ app.post("/api/auth/register", async (req, res) => {
     const passwordHash = await hashPassword(password, salt);
     const id = randomUUID();
 
-    if (authDbAvailable) {
+    if (authDbAvailable && sql) {
       const existing = await sql`SELECT id FROM linh_users WHERE email = ${normalizedEmail} LIMIT 1`;
       if (existing.rows.length) { res.status(409).json({ error: "Email này đã được đăng ký." }); return; }
       await sql`INSERT INTO linh_users (id, email, name, password_hash, password_salt) VALUES (${id}, ${normalizedEmail}, ${cleanName}, ${passwordHash}, ${salt})`;
@@ -216,7 +221,7 @@ app.post("/api/auth/login", async (req, res) => {
     const normalizedEmail = normalizeEmail(email);
 
     let user: { id: string; email: string; name: string; passwordHash: string; salt: string } | null = null;
-    if (authDbAvailable) {
+    if (authDbAvailable && sql) {
       const result = await sql<{ id: string; email: string; name: string; password_hash: string; password_salt: string }>`SELECT id, email, name, password_hash, password_salt FROM linh_users WHERE email = ${normalizedEmail} LIMIT 1`;
       const row = result.rows[0];
       if (row) user = { id: row.id, email: row.email, name: row.name, passwordHash: row.password_hash, salt: row.password_salt };
@@ -248,7 +253,7 @@ app.post("/api/auth/logout", async (req, res) => {
     const token = readSessionToken(req);
     if (token) {
       const tokenHash = hashSessionToken(token);
-      if (authDbAvailable) await sql`DELETE FROM linh_sessions WHERE token_hash = ${tokenHash}`;
+      if (authDbAvailable && sql) await sql`DELETE FROM linh_sessions WHERE token_hash = ${tokenHash}`;
       else memorySessions.delete(tokenHash);
     }
     res.setHeader("Set-Cookie", `${sessionCookieName}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`);
